@@ -9,6 +9,9 @@ import { ReceiptsModule } from './receipts/receipts.module';
 import { AuthService } from './auth/auth.service';
 import { AuthController } from './auth/auth.controller';
 import { AuthModule } from './auth/auth.module';
+import { UploadController } from './upload/upload.controller';
+import { CloudinaryService } from './upload/cloudinaryupload.service';
+import { UploadModule } from './upload/upload.module';
 
 @Module({
   imports: [
@@ -24,8 +27,9 @@ import { AuthModule } from './auth/auth.module';
     ReceiptsModule,
     AuthModule,
     JwtModule.register({}),
+    UploadModule,
   ],
-  controllers: [AppController, AuthController],
-  providers: [AppService, AuthService],
+  controllers: [AppController, AuthController, UploadController],
+  providers: [AppService, AuthService, CloudinaryService],
 })
 export class AppModule {}
