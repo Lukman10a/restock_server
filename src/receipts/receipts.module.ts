@@ -10,5 +10,6 @@ import { Receipt, ReceiptSchema } from './schemas/receipt.schema';
   ],
   controllers: [ReceiptsController],
   providers: [ReceiptsService],
+  exports: [ReceiptsService], // OCR module will need this
 })
 export class ReceiptsModule {}

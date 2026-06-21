@@ -1,3 +1,4 @@
+// src/receipts/schemas/receipt.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
@@ -8,43 +9,48 @@ export class ReceiptItem {
   @Prop({ required: true })
   name!: string;
 
-  @Prop({ default: 0 })
+  @Prop()
   quantity!: number;
 
-  @Prop({ default: 0 })
+  @Prop()
   unitPrice!: number;
 
-  @Prop({ default: 0 })
+  @Prop()
   totalPrice!: number;
 }
 
+export const ReceiptItemSchema = SchemaFactory.createForClass(ReceiptItem);
+
 @Schema({ timestamps: true })
 export class Receipt {
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true, default: null })
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   userId!: Types.ObjectId;
 
-  @Prop({ required: true, default: '' })
-  imageUrl!: string;
+  @Prop({ required: true })
+  imageUrl!: string; // Cloudinary secure_url
+
+  @Prop({ required: true })
+  imagePublicId!: string; // Cloudinary public_id, needed for deletion
 
   @Prop()
-  rawOcrText?: string;
+  rawOcrText!: string; // unprocessed text straight from OCR provider
 
   @Prop()
-  vendorName?: string;
+  vendorName!: string;
 
   @Prop()
-  vendorAddress?: string;
+  vendorAddress!: string;
 
-  @Prop({ default: 0 })
+  @Prop()
   totalAmount!: number;
 
-  @Prop({ default: 'USD' })
+  @Prop()
   currency!: string;
 
   @Prop()
-  purchaseDate?: Date;
+  purchaseDate!: Date;
 
-  @Prop({ type: [ReceiptItem], default: [] })
+  @Prop({ type: [ReceiptItemSchema], default: [] })
   items!: ReceiptItem[];
 
   @Prop({
@@ -54,7 +60,7 @@ export class Receipt {
   status!: string;
 
   @Prop()
-  ocrConfidence?: number;
+  ocrConfidence!: number;
 }
 
 export const ReceiptSchema = SchemaFactory.createForClass(Receipt);
