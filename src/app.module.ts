@@ -12,6 +12,8 @@ import { AuthModule } from './auth/auth.module';
 import { UploadController } from './upload/upload.controller';
 import { CloudinaryService } from './upload/cloudinaryupload.service';
 import { UploadModule } from './upload/upload.module';
+import { OcrService } from './ocr/ocr.service';
+import { OcrModule } from './ocr/ocr.module';
 
 @Module({
   imports: [
@@ -28,8 +30,9 @@ import { UploadModule } from './upload/upload.module';
     AuthModule,
     JwtModule.register({}),
     UploadModule,
+    OcrModule,
   ],
   controllers: [AppController, AuthController, UploadController],
-  providers: [AppService, AuthService, CloudinaryService],
+  providers: [AppService, AuthService, CloudinaryService, OcrService],
 })
 export class AppModule {}

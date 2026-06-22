@@ -1,20 +1,28 @@
 // src/receipts/receipts.service.ts
+
 import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+
 import { Receipt, ReceiptDocument } from './schemas/receipt.schema';
 import { CreateReceiptDto } from './dto/create-receipt.dto';
 import { UpdateReceiptDto } from './dto/update-receipt.dto';
 import { QueryReceiptsDto } from './dto/query-receipts.dto';
+import { OcrService } from '../ocr/ocr.service';
 
 @Injectable()
 export class ReceiptsService {
+  private readonly logger = new Logger(ReceiptsService.name);
+
   constructor(
-    @InjectModel(Receipt.name) private receiptModel: Model<ReceiptDocument>,
+    @InjectModel(Receipt.name)
+    private receiptModel: Model<ReceiptDocument>,
+    private readonly ocrService: OcrService,
   ) {}
 
   async create(
@@ -26,7 +34,13 @@ export class ReceiptsService {
       userId,
       status: 'pending',
     });
-    return receipt.save();
+
+    const saved = await receipt.save();
+
+    // Fire-and-forget OCR processing
+    void this.processOcrAsync(saved._id.toString(), dto.imageUrl);
+
+    return saved;
   }
 
   async findAllForUser(userId: string, query: QueryReceiptsDto) {
@@ -35,6 +49,7 @@ export class ReceiptsService {
     const skip = (page - 1) * limit;
 
     const filter: Record<string, any> = { userId };
+
     if (query.status) {
       filter.status = query.status;
     }
@@ -79,7 +94,7 @@ export class ReceiptsService {
     dto: UpdateReceiptDto,
     userId: string,
   ): Promise<ReceiptDocument> {
-    // ensures it exists & belongs to user
+    // Ensure ownership
     await this.findOne(id, userId);
 
     const updated = await this.receiptModel
@@ -99,11 +114,57 @@ export class ReceiptsService {
 
   async remove(id: string, userId: string): Promise<{ message: string }> {
     await this.findOne(id, userId);
+
     await this.receiptModel.findByIdAndDelete(id).exec();
+
     return { message: 'Receipt deleted successfully' };
   }
 
-  // internal helper — used later by the OCR step, not exposed via controller
+  async reprocess(id: string, userId: string): Promise<ReceiptDocument> {
+    const receipt = await this.findOne(id, userId);
+
+    await this.receiptModel.findByIdAndUpdate(id, { status: 'pending' }).exec();
+
+    // Fire-and-forget OCR again
+    void this.processOcrAsync(id, receipt.imageUrl);
+
+    return this.findOne(id, userId);
+  }
+
+  // 🔒 Internal OCR processor (async background)
+  private async processOcrAsync(
+    receiptId: string,
+    imageUrl: string,
+  ): Promise<void> {
+    try {
+      const parsed = await this.ocrService.extractFromImageUrl(imageUrl);
+
+      await this.receiptModel
+        .findByIdAndUpdate(receiptId, {
+          rawOcrText: parsed.rawOcrText,
+          vendorName: parsed.vendorName,
+          totalAmount: parsed.totalAmount,
+          currency: parsed.currency,
+          purchaseDate: parsed.purchaseDate,
+          items: parsed.items,
+          ocrConfidence: parsed.confidence,
+          status: 'processed',
+        })
+        .exec();
+
+      this.logger.log(`OCR processed successfully for receipt ${receiptId}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+
+      this.logger.error(`OCR failed for receipt ${receiptId}: ${message}`);
+
+      await this.receiptModel
+        .findByIdAndUpdate(receiptId, { status: 'failed' })
+        .exec();
+    }
+  }
+
+  // Internal helper (for OCR/manual updates)
   async updateOcrResult(id: string, data: Partial<Receipt>) {
     return this.receiptModel.findByIdAndUpdate(id, data, { new: true }).exec();
   }

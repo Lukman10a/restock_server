@@ -51,4 +51,9 @@ export class ReceiptsController {
   remove(@Param('id') id: string, @Req() req: RequestWithUser) {
     return this.receiptsService.remove(id, req.user.userId);
   }
+
+  @Post(':id/reprocess')
+  reprocess(@Param('id') id: string, @Req() req: RequestWithUser) {
+    return this.receiptsService.reprocess(id, req.user.userId);
+  }
 }
