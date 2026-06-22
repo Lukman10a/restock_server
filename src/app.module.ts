@@ -10,6 +10,7 @@ import { AuthModule } from './auth/auth.module';
 import { UploadModule } from './upload/upload.module';
 import { OcrModule } from './ocr/ocr.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { ExportModule } from './export/export.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     UploadModule,
     OcrModule,
     DashboardModule,
+    ExportModule,
   ],
   controllers: [AppController],
   providers: [AppService],
