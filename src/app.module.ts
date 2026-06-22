@@ -1,19 +1,15 @@
+// src/app.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
-import { JwtModule } from '@nestjs/jwt';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UserModule } from './users/user.module';
 import { ReceiptsModule } from './receipts/receipts.module';
-import { AuthService } from './auth/auth.service';
-import { AuthController } from './auth/auth.controller';
 import { AuthModule } from './auth/auth.module';
-import { UploadController } from './upload/upload.controller';
-import { CloudinaryService } from './upload/cloudinaryupload.service';
 import { UploadModule } from './upload/upload.module';
-import { OcrService } from './ocr/ocr.service';
 import { OcrModule } from './ocr/ocr.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -28,11 +24,11 @@ import { OcrModule } from './ocr/ocr.module';
     UserModule,
     ReceiptsModule,
     AuthModule,
-    JwtModule.register({}),
     UploadModule,
     OcrModule,
+    DashboardModule,
   ],
-  controllers: [AppController, AuthController, UploadController],
-  providers: [AppService, AuthService, CloudinaryService, OcrService],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}

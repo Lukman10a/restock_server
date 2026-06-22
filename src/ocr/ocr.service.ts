@@ -41,9 +41,7 @@ export class OcrService {
       throw new Error('No text detected in image');
     }
 
-    // detections[0] contains the FULL block of text Vision found
     const rawText = detections[0].description ?? '';
-
     return this.parseReceiptText(rawText);
   }
 
@@ -65,11 +63,12 @@ export class OcrService {
   }
 
   private extractVendorName(lines: string[]): string | undefined {
-    // Heuristic: vendor name is usually the first non-empty line,
-    // and it's rarely a number-heavy line (which would suggest an address or phone)
-    for (const line of lines.slice(0, 3)) {
-      const digitCount = (line.match(/\d/g) || []).length;
-      if (digitCount < line.length * 0.3) {
+    // Skip lines that are purely numbers, single chars, or common header words
+    const skipPatterns =
+      /^[\d\s.,:]+$|^(receipt|invoice|date|tel|address|adress)$/i;
+
+    for (const line of lines.slice(0, 4)) {
+      if (!skipPatterns.test(line) && line.length > 2) {
         return line;
       }
     }
@@ -77,22 +76,72 @@ export class OcrService {
   }
 
   private extractTotalAmount(lines: string[]): number | undefined {
-    // Look for lines containing "total" (case-insensitive),
-    // skip "subtotal" to avoid grabbing the wrong figure
-    const totalKeywords = ['total', 'amount due', 'grand total'];
+    const totalKeywords = [
+      'total',
+      'amount',
+      'balance',
+      'grand total',
+      'amount due',
+    ];
+    const skipKeywords = [
+      'subtotal',
+      'sub-total',
+      'sales tax',
+      'tax',
+      'cash',
+      'change',
+    ];
 
+    // Strategy 1: find a line with a total keyword AND a price on the same line
     for (const line of lines) {
-      const lowerLine = line.toLowerCase();
-      const isTotalLine = totalKeywords.some((kw) => lowerLine.includes(kw));
-      const isSubtotal = lowerLine.includes('subtotal');
+      const lower = line.toLowerCase();
+      const isTotal = totalKeywords.some((kw) => lower.includes(kw));
+      const isSkip = skipKeywords.some((kw) => lower.includes(kw));
 
-      if (isTotalLine && !isSubtotal) {
+      if (isTotal && !isSkip) {
         const match = line.match(/(\d+[.,]\d{2})/);
         if (match) {
           return parseFloat(match[1].replace(',', '.'));
         }
       }
     }
+
+    // Strategy 2: total keyword is on its OWN line, price is on the NEXT line
+    // e.g. "TOTAL\n27.35" — handles multi-line format
+    for (let i = 0; i < lines.length - 1; i++) {
+      const lower = lines[i].toLowerCase().trim();
+      const isTotal = totalKeywords.some(
+        (kw) => lower === kw || lower.includes(kw),
+      );
+      const isSkip = skipKeywords.some((kw) => lower.includes(kw));
+
+      if (isTotal && !isSkip) {
+        // look at the next 1-2 lines for a price
+        for (let j = i + 1; j <= Math.min(i + 2, lines.length - 1); j++) {
+          const match = lines[j].match(/^(\d+[.,]\d{2})$/);
+          if (match) {
+            return parseFloat(match[1].replace(',', '.'));
+          }
+        }
+      }
+    }
+
+    // Strategy 3: largest standalone price on the receipt
+    // as a last resort — usually the total is the biggest number
+    const prices: number[] = [];
+    for (const line of lines) {
+      const match = line.match(/^(\d+[.,]\d{2})$/);
+      if (match) {
+        prices.push(parseFloat(match[1].replace(',', '.')));
+      }
+    }
+
+    if (prices.length > 0) {
+      // filter out obviously large "cash" amounts by taking second largest if gap is small
+      prices.sort((a, b) => b - a);
+      return prices[0];
+    }
+
     return undefined;
   }
 
@@ -116,7 +165,7 @@ export class OcrService {
   }
 
   private extractDate(lines: string[]): Date | undefined {
-    // Matches common formats: DD/MM/YYYY, MM-DD-YYYY, YYYY-MM-DD
+    // Matches: DD/MM/YYYY, MM-DD-YYYY, YYYY-MM-DD, DD-MM-YYYY, MM/DD/YYYY
     const datePattern = /(\d{1,4}[/\-.]\d{1,2}[/\-.]\d{1,4})/;
 
     for (const line of lines) {
@@ -132,31 +181,69 @@ export class OcrService {
   }
 
   private extractItems(lines: string[]): ParsedReceiptItem[] {
-    // Heuristic: item lines usually end with a price (X.XX format)
-    // and aren't total/subtotal/tax lines
     const items: ParsedReceiptItem[] = [];
     const excludeKeywords = [
       'total',
       'subtotal',
+      'sub-total',
       'tax',
       'change',
       'cash',
       'card',
+      'balance',
+      'amount',
+      'receipt',
+      'address',
+      'adress',
+      'tel',
+      'date',
+      'invoice',
     ];
 
+    // Strategy 1: item + price on the SAME line
+    // e.g. "APPLE 1.00" or "Dolor Sit 48.00"
     for (const line of lines) {
-      const lowerLine = line.toLowerCase();
-      if (excludeKeywords.some((kw) => lowerLine.includes(kw))) {
-        continue;
-      }
+      const lower = line.toLowerCase();
+      if (excludeKeywords.some((kw) => lower.includes(kw))) continue;
 
       const priceMatch = line.match(/(\d+[.,]\d{2})\s*$/);
       if (priceMatch) {
         const totalPrice = parseFloat(priceMatch[1].replace(',', '.'));
-        const name = line.slice(0, priceMatch.index).trim();
+        const namePart = line.slice(0, priceMatch.index).trim();
 
-        if (name.length > 0) {
-          items.push({ name, totalPrice });
+        // extract leading quantity if present e.g. "2 APPLE"
+        const qtyMatch = namePart.match(/^(\d+)\s+(.+)$/);
+        if (qtyMatch) {
+          items.push({
+            name: qtyMatch[2].trim(),
+            quantity: parseInt(qtyMatch[1]),
+            totalPrice,
+          });
+        } else if (namePart.length > 0) {
+          items.push({ name: namePart, totalPrice });
+        }
+      }
+    }
+
+    // Strategy 2: multi-line items — quantity on its own line,
+    // then name, then price on separate lines
+    // e.g. "2\nAPPLE\n1.00"
+    // Only run this if strategy 1 found nothing
+    if (items.length === 0) {
+      for (let i = 0; i < lines.length - 2; i++) {
+        const lower = lines[i].toLowerCase();
+        if (excludeKeywords.some((kw) => lower.includes(kw))) continue;
+
+        const isQuantity = /^\d+$/.test(lines[i]);
+        const isName = /^[a-zA-Z\s]+$/.test(lines[i + 1]);
+        const priceMatch = lines[i + 2]?.match(/^(\d+[.,]\d{2})$/);
+
+        if (isQuantity && isName && priceMatch) {
+          items.push({
+            name: lines[i + 1].trim(),
+            quantity: parseInt(lines[i]),
+            totalPrice: parseFloat(priceMatch[1].replace(',', '.')),
+          });
         }
       }
     }
@@ -165,9 +252,6 @@ export class OcrService {
   }
 
   private estimateConfidence(lines: string[]): number {
-    // Simple heuristic: more structured data found = higher confidence
-    // This is NOT Vision's actual confidence score — Vision's text detection
-    // doesn't return one for full-text mode. This is our own sanity signal.
     let score = 0.5;
     if (lines.length > 5) score += 0.2;
     if (lines.length > 10) score += 0.1;

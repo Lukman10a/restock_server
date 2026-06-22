@@ -61,6 +61,10 @@ export class Receipt {
 
   @Prop()
   ocrConfidence!: number;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
 }
 
 export const ReceiptSchema = SchemaFactory.createForClass(Receipt);
