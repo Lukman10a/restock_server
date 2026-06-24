@@ -20,7 +20,6 @@ export class ReceiptItem {
 }
 
 export const ReceiptItemSchema = SchemaFactory.createForClass(ReceiptItem);
-
 @Schema({ timestamps: true })
 export class Receipt {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
@@ -35,7 +34,7 @@ export class Receipt {
   @Prop()
   rawOcrText!: string; // unprocessed text straight from OCR provider
 
-  @Prop()
+  @Prop({ default: '' })
   vendorName!: string;
 
   @Prop()
@@ -65,6 +64,30 @@ export class Receipt {
   createdAt!: Date;
 
   updatedAt!: Date;
+
+  @Prop()
+  notes!: string;
+
+  @Prop()
+  merchantCategory!: string;
+
+  @Prop()
+  taxAmount!: number;
+
+  @Prop()
+  subtotal!: number;
+
+  @Prop()
+  paymentMethod!: string;
+
+  @Prop()
+  receiptNumber!: string;
+
+  @Prop()
+  country!: string;
+
+  @Prop()
+  isDeleted!: boolean;
 }
 
 export const ReceiptSchema = SchemaFactory.createForClass(Receipt);

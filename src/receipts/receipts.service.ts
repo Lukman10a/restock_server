@@ -139,6 +139,8 @@ export class ReceiptsService {
     try {
       const parsed = await this.ocrService.extractFromImageUrl(imageUrl);
 
+      console.log('OCR PARSED:', JSON.stringify(parsed, null, 2));
+
       await this.receiptModel
         .findByIdAndUpdate(receiptId, {
           rawOcrText: parsed.rawOcrText,
@@ -151,6 +153,8 @@ export class ReceiptsService {
           status: 'processed',
         })
         .exec();
+
+      console.log('OCR PARSED:', JSON.stringify(parsed, null, 2));
 
       this.logger.log(`OCR processed successfully for receipt ${receiptId}`);
     } catch (error: unknown) {

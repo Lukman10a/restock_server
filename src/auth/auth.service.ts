@@ -11,6 +11,12 @@ import { UsersService } from '../users/user.service';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
 
+export type AuthUser = {
+  _id: string;
+  email: string;
+  fullName: string;
+};
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -29,10 +35,15 @@ export class AuthService {
 
     const user = await this.usersService.create({
       ...dto,
+      fullName: dto.fullName,
       password: hashedPassword,
     });
 
-    return this.generateTokens(user._id.toString(), user.email);
+    return this.generateTokens({
+      _id: user._id.toString(),
+      email: user.email,
+      fullName: user.fullName,
+    });
   }
 
   async login(dto: LoginDto) {
@@ -46,7 +57,11 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    return this.generateTokens(user._id.toString(), user.email);
+    return this.generateTokens({
+      _id: user._id.toString(),
+      email: user.email,
+      fullName: user.fullName,
+    });
   }
 
   async refreshTokens(refreshToken: string) {
@@ -69,7 +84,11 @@ export class AuthService {
       throw new UnauthorizedException('Access denied');
     }
 
-    return this.generateTokens(user._id.toString(), user.email);
+    return this.generateTokens({
+      _id: user._id.toString(),
+      email: user.email,
+      fullName: user.fullName,
+    });
   }
 
   async logout(userId: string) {
@@ -77,8 +96,11 @@ export class AuthService {
     return { message: 'Logged out successfully' };
   }
 
-  private async generateTokens(userId: string, email: string) {
-    const payload = { sub: userId, email };
+  private async generateTokens(user: AuthUser) {
+    const payload = {
+      sub: user._id,
+      email: user.email,
+    };
 
     const accessToken = this.jwtService.sign(payload, {
       secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
@@ -90,14 +112,17 @@ export class AuthService {
       expiresIn: '7d',
     });
 
-    // store a hashed version of the refresh token, never plain text
     const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
-    await this.usersService.updateRefreshToken(userId, hashedRefreshToken);
+    await this.usersService.updateRefreshToken(user._id, hashedRefreshToken);
 
     return {
       accessToken,
       refreshToken,
-      user: { id: userId, email },
+      user: {
+        id: user._id,
+        email: user.email,
+        fullName: user.fullName,
+      },
     };
   }
 }

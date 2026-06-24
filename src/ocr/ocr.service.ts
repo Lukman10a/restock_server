@@ -180,71 +180,115 @@ export class OcrService {
     return undefined;
   }
 
+  // private extractItems(lines: string[]): ParsedReceiptItem[] {
+  //   const items: ParsedReceiptItem[] = [];
+  //   const excludeKeywords = [
+  //     'total',
+  //     'subtotal',
+  //     'sub-total',
+  //     'tax',
+  //     'change',
+  //     'cash',
+  //     'card',
+  //     'balance',
+  //     'amount',
+  //     'receipt',
+  //     'address',
+  //     'adress',
+  //     'tel',
+  //     'date',
+  //     'invoice',
+  //   ];
+
+  //   // Strategy 1: item + price on the SAME line
+  //   // e.g. "APPLE 1.00" or "Dolor Sit 48.00"
+  //   for (const line of lines) {
+  //     const lower = line.toLowerCase();
+  //     if (excludeKeywords.some((kw) => lower.includes(kw))) continue;
+
+  //     // const priceMatch = line.match(/(\d+[.,]\d{2})\s*$/);
+  //     const priceMatch = line.match(/^(\d+(?:[.,]\d+)?)$/);
+  //     if (priceMatch) {
+  //       const totalPrice = parseFloat(priceMatch[1].replace(',', '.'));
+  //       const namePart = line.slice(0, priceMatch.index).trim();
+
+  //       // extract leading quantity if present e.g. "2 APPLE"
+  //       const qtyMatch = namePart.match(/^(\d+)\s+(.+)$/);
+  //       if (qtyMatch) {
+  //         items.push({
+  //           name: qtyMatch[2].trim(),
+  //           quantity: parseInt(qtyMatch[1]),
+  //           totalPrice,
+  //         });
+  //       } else if (namePart.length > 0) {
+  //         items.push({ name: namePart, totalPrice });
+  //       }
+  //     }
+  //   }
+
+  //   // Strategy 2: multi-line items — quantity on its own line,
+  //   // then name, then price on separate lines
+  //   // e.g. "2\nAPPLE\n1.00"
+  //   // Only run this if strategy 1 found nothing
+  //   if (items.length === 0) {
+  //     for (let i = 0; i < lines.length - 2; i++) {
+  //       const lower = lines[i].toLowerCase();
+  //       if (excludeKeywords.some((kw) => lower.includes(kw))) continue;
+
+  //       const isQuantity = /^\d+$/.test(lines[i]);
+  //       const isName = /^[a-zA-Z\s]+$/.test(lines[i + 1]);
+  //       const priceMatch = lines[i + 2]?.match(/^(\d+[.,]\d{2})$/);
+
+  //       if (isQuantity && isName && priceMatch) {
+  //         items.push({
+  //           name: lines[i + 1].trim(),
+  //           quantity: parseInt(lines[i]),
+  //           totalPrice: parseFloat(priceMatch[1].replace(',', '.')),
+  //         });
+  //       }
+  //     }
+  //   }
+
+  //   return items;
+  // }
+
   private extractItems(lines: string[]): ParsedReceiptItem[] {
     const items: ParsedReceiptItem[] = [];
-    const excludeKeywords = [
-      'total',
-      'subtotal',
-      'sub-total',
-      'tax',
-      'change',
-      'cash',
-      'card',
-      'balance',
-      'amount',
+
+    const exclude = [
       'receipt',
       'address',
-      'adress',
       'tel',
-      'date',
-      'invoice',
+      'cash',
+      'change',
+      'total',
+      'subtotal',
+      'tax',
+      'thank',
+      'approval',
+      'card',
+      'price',
+      'description',
     ];
 
-    // Strategy 1: item + price on the SAME line
-    // e.g. "APPLE 1.00" or "Dolor Sit 48.00"
-    for (const line of lines) {
-      const lower = line.toLowerCase();
-      if (excludeKeywords.some((kw) => lower.includes(kw))) continue;
+    for (let i = 0; i < lines.length - 1; i++) {
+      const current = lines[i].trim();
+      const next = lines[i + 1].trim();
 
-      const priceMatch = line.match(/(\d+[.,]\d{2})\s*$/);
-      if (priceMatch) {
-        const totalPrice = parseFloat(priceMatch[1].replace(',', '.'));
-        const namePart = line.slice(0, priceMatch.index).trim();
+      const lower = current.toLowerCase();
 
-        // extract leading quantity if present e.g. "2 APPLE"
-        const qtyMatch = namePart.match(/^(\d+)\s+(.+)$/);
-        if (qtyMatch) {
-          items.push({
-            name: qtyMatch[2].trim(),
-            quantity: parseInt(qtyMatch[1]),
-            totalPrice,
-          });
-        } else if (namePart.length > 0) {
-          items.push({ name: namePart, totalPrice });
-        }
+      if (exclude.some((word) => lower.includes(word))) {
+        continue;
       }
-    }
 
-    // Strategy 2: multi-line items — quantity on its own line,
-    // then name, then price on separate lines
-    // e.g. "2\nAPPLE\n1.00"
-    // Only run this if strategy 1 found nothing
-    if (items.length === 0) {
-      for (let i = 0; i < lines.length - 2; i++) {
-        const lower = lines[i].toLowerCase();
-        if (excludeKeywords.some((kw) => lower.includes(kw))) continue;
-
-        const isQuantity = /^\d+$/.test(lines[i]);
-        const isName = /^[a-zA-Z\s]+$/.test(lines[i + 1]);
-        const priceMatch = lines[i + 2]?.match(/^(\d+[.,]\d{2})$/);
-
-        if (isQuantity && isName && priceMatch) {
-          items.push({
-            name: lines[i + 1].trim(),
-            quantity: parseInt(lines[i]),
-            totalPrice: parseFloat(priceMatch[1].replace(',', '.')),
-          });
-        }
+      // current line is text, next line is a number
+      if (/^[a-zA-Z\s]+$/.test(current) && /^\d+(?:[.,]\d+)?$/.test(next)) {
+        items.push({
+          name: current,
+          quantity: 1,
+          unitPrice: parseFloat(next.replace(',', '.')),
+          totalPrice: parseFloat(next.replace(',', '.')),
+        });
       }
     }
 
