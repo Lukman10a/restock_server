@@ -17,13 +17,16 @@ import { CreateReceiptDto } from './dto/create-receipt.dto';
 import { UpdateReceiptDto } from './dto/update-receipt.dto';
 import { QueryReceiptsDto } from './dto/query-receipts.dto';
 import type { RequestWithUser } from '../types/request-with-user';
+import { Throttle } from '@nestjs/throttler';
 
 @Controller('receipts')
 @UseGuards(JwtAuthGuard)
 export class ReceiptsController {
   constructor(private receiptsService: ReceiptsService) {}
 
+  // OCR is expensive, max 10 scans per minute per user
   @Post()
+  @Throttle({ short: { ttl: 60000, limit: 10 } })
   create(@Body() dto: CreateReceiptDto, @Req() req: RequestWithUser) {
     return this.receiptsService.create(dto, req.user.userId);
   }
@@ -53,6 +56,7 @@ export class ReceiptsController {
   }
 
   @Post(':id/reprocess')
+  @Throttle({ short: { ttl: 60000, limit: 5 } })
   reprocess(@Param('id') id: string, @Req() req: RequestWithUser) {
     return this.receiptsService.reprocess(id, req.user.userId);
   }
