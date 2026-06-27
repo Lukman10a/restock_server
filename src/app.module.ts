@@ -11,6 +11,8 @@ import { UploadModule } from './upload/upload.module';
 import { OcrModule } from './ocr/ocr.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ExportModule } from './export/export.module';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
 @Module({
   imports: [
@@ -22,6 +24,24 @@ import { ExportModule } from './export/export.module';
         uri: configService.get<string>('MONGODB_URI'),
       }),
     }),
+
+    ThrottlerModule.forRoot([
+      {
+        name: 'short',
+        ttl: 5000, // 5 second
+        limit: 2, // max 2 requests per second
+      },
+      {
+        name: 'medium',
+        ttl: 60000, // 1 minute
+        limit: 100, // max 100 requests per minute
+      },
+      {
+        name: 'long',
+        ttl: 3600000, // 1 hour
+        limit: 500, // max 500 requests per hour
+      },
+    ]),
     UserModule,
     ReceiptsModule,
     AuthModule,
@@ -31,6 +51,12 @@ import { ExportModule } from './export/export.module';
     ExportModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard, // applies globally to every route
+    },
+  ],
 })
 export class AppModule {}
