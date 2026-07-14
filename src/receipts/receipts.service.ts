@@ -120,6 +120,11 @@ export class ReceiptsService {
     return { message: 'Receipt deleted successfully' };
   }
 
+  async removeAllForUser(userId: string): Promise<{ message: string }> {
+    await this.receiptModel.deleteMany({ userId }).exec();
+    return { message: 'All receipts deleted successfully' };
+  }
+
   async reprocess(id: string, userId: string): Promise<ReceiptDocument> {
     const receipt = await this.findOne(id, userId);
 
