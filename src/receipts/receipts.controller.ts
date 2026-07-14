@@ -55,6 +55,11 @@ export class ReceiptsController {
     return this.receiptsService.remove(id, req.user.userId);
   }
 
+  @Delete()
+  removeAll(@Req() req: RequestWithUser) {
+    return this.receiptsService.removeAllForUser(req.user.userId);
+  }
+
   @Post(':id/reprocess')
   @Throttle({ short: { ttl: 60000, limit: 5 } })
   reprocess(@Param('id') id: string, @Req() req: RequestWithUser) {

@@ -1,4 +1,6 @@
 // src/main.ts
+import './instrumentation';
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
@@ -6,6 +8,17 @@ import { GlobalExceptionFilter } from './filters/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  app.enableCors({
+    origin: [
+      'http://localhost:3001', // admin dashboard dev
+      'http://localhost:8081', // Expo dev
+      'https://restock-admin-frontend.vercel.app/', // admin dashboard prod (update this)
+    ],
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  });
 
   app.useGlobalFilters(new GlobalExceptionFilter());
 

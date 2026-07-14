@@ -33,8 +33,38 @@ export class OcrService {
     });
   }
 
+  // async extractFromImageUrl(imageUrl: string): Promise<ParsedReceiptData> {
+  //   const [result] = await this.client.textDetection(imageUrl);
+  //   const detections = result.textAnnotations;
+
+  //   if (!detections || detections.length === 0) {
+  //     throw new Error('No text detected in image');
+  //   }
+
+  //   const rawText = detections[0].description ?? '';
+  //   return this.parseReceiptText(rawText);
+  // }
+
+  // src/ocr/ocr.service.ts — add this helper and update extractFromImageUrl
+
   async extractFromImageUrl(imageUrl: string): Promise<ParsedReceiptData> {
-    const [result] = await this.client.textDetection(imageUrl);
+    // 30 second timeout, if Vision doesn't respond, fail cleanly
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error('OCR request timed out after 30 seconds')),
+        30000,
+      ),
+    );
+
+    const ocrPromise = this.client.textDetection(imageUrl);
+
+    const [result] = await Promise.race([
+      ocrPromise,
+      timeoutPromise.then(() => {
+        throw new Error('OCR timed out');
+      }),
+    ]);
+
     const detections = result.textAnnotations;
 
     if (!detections || detections.length === 0) {
@@ -179,78 +209,6 @@ export class OcrService {
     }
     return undefined;
   }
-
-  // private extractItems(lines: string[]): ParsedReceiptItem[] {
-  //   const items: ParsedReceiptItem[] = [];
-  //   const excludeKeywords = [
-  //     'total',
-  //     'subtotal',
-  //     'sub-total',
-  //     'tax',
-  //     'change',
-  //     'cash',
-  //     'card',
-  //     'balance',
-  //     'amount',
-  //     'receipt',
-  //     'address',
-  //     'adress',
-  //     'tel',
-  //     'date',
-  //     'invoice',
-  //   ];
-
-  //   // Strategy 1: item + price on the SAME line
-  //   // e.g. "APPLE 1.00" or "Dolor Sit 48.00"
-  //   for (const line of lines) {
-  //     const lower = line.toLowerCase();
-  //     if (excludeKeywords.some((kw) => lower.includes(kw))) continue;
-
-  //     // const priceMatch = line.match(/(\d+[.,]\d{2})\s*$/);
-  //     const priceMatch = line.match(/^(\d+(?:[.,]\d+)?)$/);
-  //     if (priceMatch) {
-  //       const totalPrice = parseFloat(priceMatch[1].replace(',', '.'));
-  //       const namePart = line.slice(0, priceMatch.index).trim();
-
-  //       // extract leading quantity if present e.g. "2 APPLE"
-  //       const qtyMatch = namePart.match(/^(\d+)\s+(.+)$/);
-  //       if (qtyMatch) {
-  //         items.push({
-  //           name: qtyMatch[2].trim(),
-  //           quantity: parseInt(qtyMatch[1]),
-  //           totalPrice,
-  //         });
-  //       } else if (namePart.length > 0) {
-  //         items.push({ name: namePart, totalPrice });
-  //       }
-  //     }
-  //   }
-
-  //   // Strategy 2: multi-line items — quantity on its own line,
-  //   // then name, then price on separate lines
-  //   // e.g. "2\nAPPLE\n1.00"
-  //   // Only run this if strategy 1 found nothing
-  //   if (items.length === 0) {
-  //     for (let i = 0; i < lines.length - 2; i++) {
-  //       const lower = lines[i].toLowerCase();
-  //       if (excludeKeywords.some((kw) => lower.includes(kw))) continue;
-
-  //       const isQuantity = /^\d+$/.test(lines[i]);
-  //       const isName = /^[a-zA-Z\s]+$/.test(lines[i + 1]);
-  //       const priceMatch = lines[i + 2]?.match(/^(\d+[.,]\d{2})$/);
-
-  //       if (isQuantity && isName && priceMatch) {
-  //         items.push({
-  //           name: lines[i + 1].trim(),
-  //           quantity: parseInt(lines[i]),
-  //           totalPrice: parseFloat(priceMatch[1].replace(',', '.')),
-  //         });
-  //       }
-  //     }
-  //   }
-
-  //   return items;
-  // }
 
   private extractItems(lines: string[]): ParsedReceiptItem[] {
     const items: ParsedReceiptItem[] = [];
