@@ -13,7 +13,7 @@ async function bootstrap() {
     origin: [
       'http://localhost:3001', // admin dashboard dev
       'http://localhost:8081', // Expo dev
-      'https://restock-admin-frontend.vercel.app/', // admin dashboard prod (update this)
+      'https://restock-admin-frontend.vercel.app', // admin dashboard prod
     ],
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
